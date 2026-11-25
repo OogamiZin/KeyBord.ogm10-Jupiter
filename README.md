@@ -37,7 +37,7 @@ Webブラウザ（PC版Chrome か Edge）で、マクロの編集、キー割り
 | # | やること | 詳しい手順 |
 |---|---|---|
 | 1 | メイン基板を JLCPCB に注文する（部品実装込み） | [pcb/README.md](pcb/README.md) |
-| 2 | トッププレート（1.2 mm）とボトムプレート（1.6 mm）を JLCPCB に注文する | [plate/README.md](plate/README.md) |
+| 2 | トッププレートとボトムプレート（どちらも 1.6 mm）を JLCPCB に注文する | [plate/README.md](plate/README.md) |
 | 3 | 手はんだ部品と、下の「自分で用意するもの」を買う・3D プリントする | [pcb/README.md](pcb/README.md#自分ではんだ付けする部品)、下の表 |
 | 4 | ソケットとエンコーダーをはんだ付けし、ファームウェアを書き込む | 下の「書き込み」 |
 | 5 | プレートを重ねてネジで留め、スイッチ・キーキャップ・ノブを付ける | 下の「組み立て」 |
@@ -48,7 +48,7 @@ Webブラウザ（PC版Chrome か Edge）で、マクロの編集、キー割り
 | 注文先 | 何を | 使うデータ |
 |---|---|---|
 | JLCPCB（PCB + PCBA） | メイン基板（板厚 1.6 mm、裏面に部品実装） | `pcb/ogm10-Jupiter-pcb.json` から出力した Gerber・BOM・CPL |
-| JLCPCB（PCB のみ） | トッププレート（板厚 1.2 mm） | `plate/ogm10-Jupiter-top-plate.json` から出力した Gerber |
+| JLCPCB（PCB のみ） | トッププレート（板厚 1.6 mm） | `plate/ogm10-Jupiter-top-plate.json` から出力した Gerber |
 | JLCPCB（PCB のみ） | ボトムプレート（板厚 1.6 mm） | `plate/ogm10-Jupiter-bottom-plate.json` から出力した Gerber |
 | LCSC など | ホットスワップソケット 43 個、ロータリーエンコーダー 2 個 | [pcb/README.md](pcb/README.md#自分ではんだ付けする部品) |
 
