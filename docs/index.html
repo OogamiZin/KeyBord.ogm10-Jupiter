@@ -2520,7 +2520,7 @@ if (typeof module === 'object' && module.exports) module.exports = JupiterCore;
     const cur = layerInfo(K.layer);
     $('kboard').style.borderTopColor = cur && cur.gi >= 0 ? getComputedStyle($('kTabs').querySelector('.lgroup.act')).borderLeftColor : 'transparent';
     $('kStatus').textContent = '';
-    updateWriteBtn();
+    updateWriteBtn(); kDiscardState();
     const board = $('kboard');
     const V = boardView(LAYOUT);
     board.style.aspectRatio = V.width + ' / ' + V.height;
@@ -2598,6 +2598,14 @@ if (typeof module === 'object' && module.exports) module.exports = JupiterCore;
     $('kSel').textContent = layerLabel(K.layer) + ' ／ ' + (kn ? '左右'.charAt(kn.n.e) + 'ノブ（エンコーダー ' + kn.n.e + '）' + KNOB_SYM[kn.part] + ' ' + KNOB_NAME[kn.part] + (k.enc === undefined ? '（行 ' + k.row + '・列 ' + k.col + '）' : '')
       : k.enc !== undefined ? 'エンコーダー ' + k.enc + (k.dir ? ' 時計回り' : ' 反時計回り') : '行 ' + k.row + '・列 ' + k.col);
     $('kText').value = C.keycodeToQmk(kVal(K.layer, k), D.def.custom);
+    kDiscardState();
+  }
+  /* 「変更破棄」は、捨てる変更があるときだけ押せる（マクロ画面と同じ） */
+  function kDiscardState() {
+    if (!K.edit) return;
+    const k = kKeys()[K.sel];
+    $('kRevert').disabled = !k || kVal(K.layer, k) === kBase(K.layer, k);
+    $('kReload').disabled = !keysChanges().length;
   }
   function keysAssign(kc, stay) {
     if (!K.edit) return;
@@ -2616,7 +2624,12 @@ if (typeof module === 'object' && module.exports) module.exports = JupiterCore;
   ['kTrns', 'kNo'].forEach(id => $(id).addEventListener('mousedown', e => e.preventDefault()));
   $('kTrns').addEventListener('click', () => keysAssign(1));
   $('kNo').addEventListener('click', () => keysAssign(0));
-  $('kRevert').addEventListener('click', () => keysAssign(kBase(K.layer, kKeys()[K.sel]), true));
+  $('kRevert').addEventListener('click', () => {
+    const k = kKeys()[K.sel];
+    if (!K.edit || !k || kVal(K.layer, k) === kBase(K.layer, k)) return;
+    keysAssign(kBase(K.layer, k), true);
+    kToast('このキーの変更を破棄しました', true);
+  });
   /* このキーだけ初期設定に戻す（初期設定はキーボードから一度だけ読んで覚えておく。書き込むのは「書込」を押したとき） */
   $('kKeyDefault').addEventListener('click', async () => {
     if (!st.vial || !K.edit) return;
@@ -3322,8 +3335,9 @@ if (typeof module === 'object' && module.exports) module.exports = JupiterCore;
   });
   $('kReload').addEventListener('click', async () => {
     const n = keysChanges().length;
-    if (n && !confirm('キー割当の書き込んでいない変更 ' + n + ' 件を破棄しますか？')) return;
-    try { await dispLoadKeymap(); K.edit = clone(D.keymap); K.encEdit = clone(D.enc); keysRender(); keysShowSel(); if ($('kTextBox').open) keysTextShow(); kToast('', true); }
+    if (!n) return;
+    if (!confirm('キー割当の書き込んでいない変更 ' + n + ' 件を破棄しますか？')) return;
+    try { await dispLoadKeymap(); K.edit = clone(D.keymap); K.encEdit = clone(D.enc); keysRender(); keysShowSel(); if ($('kTextBox').open) keysTextShow(); kToast('キー割当の変更 ' + n + ' 件を破棄しました', true); }
     catch (e) { kToast('読み込みに失敗: ' + e.message, false); }
   });
 
