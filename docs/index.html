@@ -213,6 +213,15 @@ select { font: inherit; color: var(--ink); background: var(--panel); border: 1px
 .k.layer > div { background: var(--chip); border-color: var(--accent); }
 .k.macro > div, .k.custom > div { background: var(--chip-key); }
 .k.enc > div { border-radius: 50%; }
+/* ノブ: エンコーダーの回転（↺ ↻）と押し込み（●）を1つにまとめた丸いキー */
+.k.knob > div { border-radius: 45% / 35%; gap: 0; padding: 0 .15cqw; }
+.k.knob .kn { display: block; max-width: 100%; overflow: hidden; white-space: nowrap; font-size: 1.1cqw; font-weight: 650; line-height: 1.3; }
+.k.knob .kn.on { color: var(--accent); text-decoration: underline; text-underline-offset: .15cqw; }
+.k.knob .kn.chg { color: var(--dirty); }
+#vjBoard .k.knob .kn { cursor: pointer; padding: 0 .2cqw; border-radius: .4cqw; }
+#vjBoard .k.knob .kn:hover { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+#vjBoard .k.knob .kn.down { background: var(--accent); color: #fff; }
+.knobmenu { z-index: 60; }
 .menu { position: absolute; left: 0; top: calc(100% + 4px); z-index: 40; width: min(440px, calc(100vw - 48px)); max-height: 340px; overflow: auto; padding: 4px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 8px 24px rgba(0, 0, 0, .25); }
 .menu.up { top: auto; bottom: calc(100% + 4px); }
 .menu .msec { --mc: var(--sub); margin-bottom: 4px; border-left: 4px solid var(--mc); border-radius: 6px; background: color-mix(in srgb, var(--mc) 9%, var(--panel)); overflow: hidden; }
@@ -546,7 +555,7 @@ body.pip .tlist { grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); 
         <div id="board" class="board"></div>
         <details id="legendBox" hidden><summary>専用キー・マクロの説明</summary><dl id="legend"></dl></details>
         <div id="dTrig" class="trigview" hidden></div>
-    <p id="dHint" class="hint nopip">キーの左上の青い文字は、Shift を押しながら打つと出る文字です（JIS 配列）。薄い表示は、下のレイヤーの割り当てがそのまま効いているキーです。丸いキーはエンコーダーの回転（↺ 反時計回り、↻ 時計回り）です。</p>
+    <p id="dHint" class="hint nopip">キーの左上の青い文字は、Shift を押しながら打つと出る文字です（JIS 配列）。薄い表示は、下のレイヤーの割り当てがそのまま効いているキーです。左上と右上の丸いノブは、エンコーダーの回転（↺ 反時計回り、↻ 時計回り）と押し込み（●）の割り当てをまとめて表示しています。</p>
       </div>
     </div>
   </div>
@@ -1866,7 +1875,7 @@ if (typeof module === 'object' && module.exports) module.exports = JupiterCore;
       { name: 'AUTO_CLICK_30', shortName: 'AutoClk30', title: '押している間、マウスの左クリックを連打します（1 秒に 30 回）' },
       { name: 'AUTO_CLICK_50', shortName: 'AutoClk50', title: '押している間、マウスの左クリックを連打します（1 秒に 50 回）' },
     ],
-    layouts: { keymap: [[{"w":0.75},"0,0",{"x":10.5,"w":0.75},"0,11"],[{"y":-0.75,"x":0.75},"0,1","0,2","0,3","0,4","0,5","0,6","0,7","0,8","0,9","0,10"],["1,0","1,1","1,2","1,3","1,4","1,5","1,6","1,7","1,8","1,9","1,10","1,11"],[{"w":1.5},"2,0","2,1","2,2","2,3","2,4","2,5","2,6","2,7","2,8",{"x":0.5},"2,10","2,11"],["3,0",{"x":0.25},"3,1","3,2",{"x":0.25},"3,3",{"w":1.5},"3,4",{"w":1.5},"3,6","3,7",{"x":0.5},"3,9","3,10","3,11"],[{"y":0.25},"0,0\n\n\n\n\n\n\n\n\ne","0,1\n\n\n\n\n\n\n\n\ne",{"x":8},"1,0\n\n\n\n\n\n\n\n\ne","1,1\n\n\n\n\n\n\n\n\ne"]] },
+    layouts: { keymap: [["0,0\n\n\n\n\n\n\n\n\ne","0,1\n\n\n\n\n\n\n\n\ne",{"x":8},"1,0\n\n\n\n\n\n\n\n\ne","1,1\n\n\n\n\n\n\n\n\ne"],[{"y":0.25,"w":0.75},"0,0",{"x":10.5,"w":0.75},"0,11"],[{"y":-0.75,"x":0.75},"0,1","0,2","0,3","0,4","0,5","0,6","0,7","0,8","0,9","0,10"],["1,0","1,1","1,2","1,3","1,4","1,5","1,6","1,7","1,8","1,9","1,10","1,11"],[{"w":1.5},"2,0","2,1","2,2","2,3","2,4","2,5","2,6","2,7","2,8",{"x":0.5},"2,10","2,11"],["3,0",{"x":0.25},"3,1","3,2",{"x":0.25},"3,3",{"w":1.5},"3,4",{"w":1.5},"3,6","3,7",{"x":0.5},"3,9","3,10","3,11"]] },
   };
   const isJupiter = () => !!st.vial && JUPITER.uid.every((b, i) => st.vial.uid[i] === b);
   const D = { trig: false, def: null, defNote: '', keymap: null, enc: null, layers: 0, state: null, supported: null, pin: null, timer: null, busy: false, pip: null, mode: 'macro' };
@@ -1979,6 +1988,48 @@ if (typeof module === 'object' && module.exports) module.exports = JupiterCore;
     b.addEventListener('click', onClick);
     wrap.appendChild(b); box.appendChild(wrap);
   }
+  /* ---- ノブ（エンコーダーの回転と押し込みを1つにまとめた表示） ----
+     vial.json ではエンコーダーの回転（↺ / ↻）と押し込みキーは別々の部品。盤面では押し込みキーの位置に
+     丸いノブを1つだけ描き、その中に ↺ / ↻ / ● の3つの割り当てを並べる。回転の部品が置かれていた行は詰める。 */
+  const ENC_PUSH = [[0, 0], [0, 11]];   /* エンコーダー n の押し込みが入っているマトリクスの位置（ogm10-Jupiter） */
+  const KNOB_W = 1.3;                   /* ノブの表示幅（u） */
+  const KNOB_SYM = ['↺', '↻', '●'], KNOB_NAME = ['反時計回り', '時計回り', '押し込み'];
+  function boardView(LAYOUT) {
+    const keys = LAYOUT.keys, knobs = [], knobOf = new Map();
+    ENC_PUSH.forEach(([r, c], e) => {
+      const push = keys.findIndex(k => k.enc === undefined && k.row === r && k.col === c);
+      const ccw = keys.findIndex(k => k.enc === e && k.dir === 0), cw = keys.findIndex(k => k.enc === e && k.dir === 1);
+      if (push < 0 || ccw < 0 || cw < 0) return;
+      const n = { e, parts: [ccw, cw, push] }; knobs.push(n);
+      n.parts.forEach((i, part) => knobOf.set(i, { n, part }));
+    });
+    const items = [];
+    keys.forEach((k, i) => { if (!knobOf.has(i)) items.push({ i, k, x: k.x, y: k.y, w: k.w, h: k.h }); });
+    /* ノブは押し込みキーより幅広く描く（基板の端の外側へはみ出させる。文字が読める大きさにするため） */
+    const midX = Math.max(...keys.map(k => k.x + k.w)) / 2;
+    knobs.forEach(n => {
+      const p = keys[n.parts[2]], w = Math.max(p.w, KNOB_W);
+      items.push({ i: n.parts[2], k: p, knob: n, x: p.x + p.w / 2 < midX ? p.x + p.w - w : p.x, y: p.y, w, h: p.h });
+    });
+    const x0 = Math.min(...items.map(t => t.x)), y0 = Math.min(...items.map(t => t.y));
+    items.forEach(t => { t.x -= x0; t.y -= y0; });
+    return { items, knobOf, width: Math.max(1, ...items.map(t => t.x + t.w)), height: Math.max(1, ...items.map(t => t.y + t.h)) };
+  }
+  function placeItem(el, t, V) {
+    el.style.left = (t.x / V.width * 100) + '%'; el.style.top = (t.y / V.height * 100) + '%';
+    el.style.width = (t.w / V.width * 100) + '%'; el.style.height = (t.h / V.height * 100) + '%';
+  }
+  /* ノブの中身: ↺ / ↻ / ● の3行。labs は3つのラベル、on はハイライトする行の番号（なければ -1）、chg は変更ありの行 */
+  function knobFill(doc, box, labs, on, chg) {
+    box.textContent = '';
+    return labs.map((lab, part) => {
+      const row = doc.createElement('span');
+      row.className = 'kn' + (part === on ? ' on' : '') + (chg && chg[part] ? ' chg' : '');
+      row.textContent = KNOB_SYM[part] + ' ' + (lab.main || lab.sub || '');
+      box.appendChild(row); return row;
+    });
+  }
+  const knobTitle = (n, texts) => '左右'.charAt(n.e) + 'ノブ（エンコーダー ' + n.e + '）\n' + KNOB_SYM.map((s, p) => s + ' ' + KNOB_NAME[p] + ': ' + texts[p]).join('\n');
   function renderTrig(box, doc) {
     const list = trigList();
     box.textContent = '';
@@ -1993,14 +2044,24 @@ if (typeof module === 'object' && module.exports) module.exports = JupiterCore;
     const items = [];
     const paint = () => {
       const t = list[T.sel] || {}, has = (arr, k) => (arr || []).some(([r, c]) => k.row === r && k.col === c);
-      board.style.aspectRatio = LAYOUT.width + ' / ' + LAYOUT.height;
+      const V = boardView(LAYOUT);
+      board.style.aspectRatio = V.width + ' / ' + V.height;
       board.textContent = '';
-      for (const k of LAYOUT.keys) {
+      for (const it of V.items) {
+        const k = it.k;
+        if (it.knob) {
+          const labs = it.knob.parts.map(i => { const q = LAYOUT.keys[i]; return C.keyLabel(q.enc !== undefined ? D.enc[0][q.enc][q.dir] : D.keymap[0][q.row][q.col], ctx); });
+          const el = doc.createElement('div');
+          el.className = 'k knob' + (has(t.hold, k) ? ' th' : has(t.press, k) ? ' tp' : '');
+          placeItem(el, it, V);
+          const bx = doc.createElement('div'); knobFill(doc, bx, labs, has(t.hold, k) || has(t.press, k) ? 2 : -1);
+          el.appendChild(bx); board.appendChild(el);
+          continue;
+        }
         const kc = k.enc !== undefined ? D.enc[0][k.enc][k.dir] : D.keymap[0][k.row][k.col], lab = C.keyLabel(kc, ctx);
         const el = doc.createElement('div');
         el.className = 'k ' + lab.kind + (k.enc !== undefined ? ' enc' : '') + (k.enc === undefined && has(t.hold, k) ? ' th' : k.enc === undefined && has(t.press, k) ? ' tp' : '');
-        el.style.left = (k.x / LAYOUT.width * 100) + '%'; el.style.top = (k.y / LAYOUT.height * 100) + '%';
-        el.style.width = (k.w / LAYOUT.width * 100) + '%'; el.style.height = (k.h / LAYOUT.height * 100) + '%';
+        placeItem(el, it, V);
         const bx = doc.createElement('div'), m = doc.createElement('span');
         const main = (k.enc !== undefined ? (k.dir ? '↻ ' : '↺ ') : '') + lab.main;
         m.className = 'm' + (main.length > 4 * k.w ? ' long' : ''); m.textContent = main; bx.appendChild(m);
@@ -2129,16 +2190,31 @@ if (typeof module === 'object' && module.exports) module.exports = JupiterCore;
     if (D.defNote) E.status.textContent += ' ' + D.defNote;
     const ctx = { macros: st.macros, custom: D.def.custom };
     const notes = new Map();
-    E.board.style.aspectRatio = LAYOUT.width + ' / ' + LAYOUT.height;
+    const V = boardView(LAYOUT);
+    E.board.style.aspectRatio = V.width + ' / ' + V.height;
     E.board.textContent = ''; tipHide(doc);
-    for (const k of LAYOUT.keys) {
+    const effOf = q => {
       const per = [];
-      for (let l = 0; l < D.layers; l++) per.push(k.enc !== undefined ? D.enc[l][k.enc][k.dir] : D.keymap[l][k.row][k.col]);
-      const eff = C.effective(per, mask), lab = C.keyLabel(eff.kc, ctx);
+      for (let l = 0; l < D.layers; l++) per.push(q.enc !== undefined ? D.enc[l][q.enc][q.dir] : D.keymap[l][q.row][q.col]);
+      return C.effective(per, mask);
+    };
+    for (const it of V.items) {
+      const k = it.k;
+      if (it.knob) {
+        const effs = it.knob.parts.map(i => effOf(LAYOUT.keys[i])), labs = effs.map(f => C.keyLabel(f.kc, ctx));
+        const el = doc.createElement('div');
+        el.className = 'k knob' + (effs.every(f => f.layer !== view.top) ? ' low' : '');
+        placeItem(el, it, V);
+        const box = doc.createElement('div'); knobFill(doc, box, labs, -1);
+        el.title = knobTitle(it.knob, effs.map((f, p) => C.keycodeToQmk(f.kc, D.def.custom) + (f.layer !== view.top ? '（' + layerLabel(f.layer) + '）' : '')));
+        labs.forEach(lab => { if (lab.desc && lab.desc !== '（空）' && !notes.has(lab.kind + lab.id)) notes.set(lab.kind + lab.id, lab); });
+        el.appendChild(box); E.board.appendChild(el);
+        continue;
+      }
+      const eff = effOf(k), lab = C.keyLabel(eff.kc, ctx);
       const el = doc.createElement('div');
       el.className = 'k ' + lab.kind + (eff.layer !== view.top && lab.kind !== 'none' ? ' low' : '') + (k.enc !== undefined ? ' enc' : '');
-      el.style.left = (k.x / LAYOUT.width * 100) + '%'; el.style.top = (k.y / LAYOUT.height * 100) + '%';
-      el.style.width = (k.w / LAYOUT.width * 100) + '%'; el.style.height = (k.h / LAYOUT.height * 100) + '%';
+      placeItem(el, it, V);
       const box = doc.createElement('div');
       const main = (k.enc !== undefined ? (k.dir ? '↻ ' : '↺ ') : '') + lab.main;
       const m = doc.createElement('span'); m.className = 'm' + (main.length > 4 * k.w ? ' long' : ''); m.textContent = main;
@@ -2180,7 +2256,11 @@ if (typeof module === 'object' && module.exports) module.exports = JupiterCore;
   function kToast(msg, ok) { const t = $('kToast'); t.textContent = msg; t.title = msg; t.className = ok ? 'ok' : 'ng'; }
   const kKeys = () => D.def.layout.keys;
   /* 見た目の順（上から下、左から右）。「次のキーへ進む」で使う */
-  const kOrder = () => kKeys().map((k, i) => i).sort((a, b) => kKeys()[a].y - kKeys()[b].y || kKeys()[a].x - kKeys()[b].x);
+  const kOrder = () => {
+    /* 盤面の見た目の順。ノブは ↺ → ↻ → ● の順にたどる */
+    const V = boardView(D.def.layout);
+    return V.items.slice().sort((a, b) => a.y - b.y || a.x - b.x).flatMap(t => (t.knob ? t.knob.parts : [t.i]));
+  };
   const kGet = (src, encSrc, layer, k) => (k.enc !== undefined ? encSrc[layer][k.enc][k.dir] : src[layer][k.row][k.col]);
   const kVal = (layer, k) => kGet(K.edit, K.encEdit, layer, k);
   const kBase = (layer, k) => kGet(D.keymap, D.enc, layer, k);
@@ -2349,9 +2429,24 @@ if (typeof module === 'object' && module.exports) module.exports = JupiterCore;
     $('kStatus').textContent = '';
     updateWriteBtn();
     const board = $('kboard');
-    board.style.aspectRatio = LAYOUT.width + ' / ' + LAYOUT.height;
-    board.textContent = ''; tipHide(document);
-    LAYOUT.keys.forEach((k, i) => {
+    const V = boardView(LAYOUT);
+    board.style.aspectRatio = V.width + ' / ' + V.height;
+    board.textContent = ''; tipHide(document); knobMenuClose();
+    V.items.forEach(it => {
+      const k = it.k, i = it.i;
+      if (it.knob) {
+        const parts = it.knob.parts, ks = parts.map(j => LAYOUT.keys[j]);
+        const kcs = ks.map(q => kVal(K.layer, q)), labs = kcs.map(kc => C.keyLabel(kc, ctx));
+        const chg = ks.map((q, p) => kcs[p] !== kBase(K.layer, q)), on = parts.indexOf(K.sel);
+        const el = document.createElement('div');
+        el.className = 'k knob' + (on >= 0 ? ' sel' : '') + (chg.some(Boolean) ? ' chg' : '');
+        placeItem(el, it, V);
+        const box = document.createElement('div'); knobFill(document, box, labs, on, chg);
+        el.title = knobTitle(it.knob, kcs.map(kc => C.keycodeToQmk(kc, D.def.custom))) + '\nクリックして、設定する動作を選びます';
+        el.addEventListener('click', e => { e.stopPropagation(); knobMenuOpen(el, it.knob, labs, kcs); });
+        el.appendChild(box); board.appendChild(el);
+        return;
+      }
       const kc = kVal(K.layer, k), lab = C.keyLabel(kc, ctx);
       let sub = lab.sub;
       if (kc === 1) {
@@ -2362,8 +2457,7 @@ if (typeof module === 'object' && module.exports) module.exports = JupiterCore;
       }
       const el = document.createElement('div');
       el.className = 'k ' + lab.kind + (k.enc !== undefined ? ' enc' : '') + (i === K.sel ? ' sel' : '') + (kc !== kBase(K.layer, k) ? ' chg' : '') + (kc === 1 ? ' low' : '');
-      el.style.left = (k.x / LAYOUT.width * 100) + '%'; el.style.top = (k.y / LAYOUT.height * 100) + '%';
-      el.style.width = (k.w / LAYOUT.width * 100) + '%'; el.style.height = (k.h / LAYOUT.height * 100) + '%';
+      placeItem(el, it, V);
       const box = document.createElement('div');
       const main = (k.enc !== undefined ? (k.dir ? '↻ ' : '↺ ') : '') + lab.main;
       const m = document.createElement('span'); m.className = 'm' + (main.length > 4 * k.w ? ' long' : ''); m.textContent = main; box.appendChild(m);
@@ -2374,11 +2468,42 @@ if (typeof module === 'object' && module.exports) module.exports = JupiterCore;
       el.appendChild(box); board.appendChild(el);
     });
   }
+  /* ノブをクリックしたときのポップアップ: ↺ / ↻ / ● のどれを設定するか選ぶ */
+  function knobMenuClose() { const m = document.querySelector('.knobmenu'); if (m) m.remove(); }
+  function knobMenuOpen(el, n, labs, kcs) {
+    const wasOpen = !!el.querySelector('.knobmenu');
+    knobMenuClose();
+    if (wasOpen) return;   /* 同じノブをもう一度クリックしたら閉じるだけ */
+    const menu = document.createElement('section'); menu.className = 'menu knobmenu';   /* div だと .k > div の見た目が付くので section にする */ menu.dataset.enc = n.e;
+    menu.style.width = 'min(320px, calc(100vw - 48px))';
+    const sec = document.createElement('div'); sec.className = 'msec ms4';
+    const head = document.createElement('div'); head.className = 'mhead'; head.textContent = '左右'.charAt(n.e) + 'ノブ（エンコーダー ' + n.e + '）: 設定する動作を選んでください';
+    sec.appendChild(head);
+    n.parts.forEach((i, p) => {
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'mitem';
+      const a = document.createElement('span'); a.className = 'mn'; a.textContent = KNOB_SYM[p] + ' ' + KNOB_NAME[p];
+      const d = document.createElement('span'); d.className = 'md'; d.textContent = C.keycodeToQmk(kcs[p], D.def.custom) + (labs[p].main ? '（' + labs[p].main + '）' : '');
+      b.append(a, d);
+      b.addEventListener('click', e => { e.stopPropagation(); knobMenuClose(); K.sel = i; keysRender(); keysShowSel(); $('kText').focus(); $('kText').select(); });
+      sec.appendChild(b);
+    });
+    menu.appendChild(sec);
+    /* ノブが盤面の右寄りなら、メニューを右端そろえにする */
+    const r = el.getBoundingClientRect(), br = el.parentNode.getBoundingClientRect();
+    if (r.left - br.left > br.width / 2) { menu.style.left = 'auto'; menu.style.right = '0'; }
+    if (br.bottom - r.bottom < 170 && r.top - br.top > 170) menu.classList.add('up');
+    menu.addEventListener('click', e => e.stopPropagation());
+    el.appendChild(menu);
+    const first = menu.querySelector('.mitem'); if (first) first.focus();
+  }
+  document.addEventListener('click', knobMenuClose);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') knobMenuClose(); });
   /* 選択中のキーの名前と現在値を、入力欄に出す */
   function keysShowSel() {
     if (!K.edit) return;
-    const k = kKeys()[K.sel];
-    $('kSel').textContent = layerLabel(K.layer) + ' ／ ' + (k.enc !== undefined ? 'エンコーダー ' + k.enc + (k.dir ? ' 時計回り' : ' 反時計回り') : '行 ' + k.row + '・列 ' + k.col);
+    const k = kKeys()[K.sel], kn = boardView(D.def.layout).knobOf.get(K.sel);
+    $('kSel').textContent = layerLabel(K.layer) + ' ／ ' + (kn ? '左右'.charAt(kn.n.e) + 'ノブ（エンコーダー ' + kn.n.e + '）' + KNOB_SYM[kn.part] + ' ' + KNOB_NAME[kn.part] + (k.enc === undefined ? '（行 ' + k.row + '・列 ' + k.col + '）' : '')
+      : k.enc !== undefined ? 'エンコーダー ' + k.enc + (k.dir ? ' 時計回り' : ' 反時計回り') : '行 ' + k.row + '・列 ' + k.col);
     $('kText').value = C.keycodeToQmk(kVal(K.layer, k), D.def.custom);
   }
   function keysAssign(kc, stay) {
@@ -3542,13 +3667,33 @@ if (typeof module === 'object' && module.exports) module.exports = JupiterCore;
   function vjRelease(i) { const h = VJ.held.get(i); if (!h) return; VJ.held.delete(i); vjUp(h); vjUpdate(); }
   function vjReleaseAll() { [...VJ.held.keys()].forEach(vjRelease); VJ.latched.clear(); VJ.mods = 0; VJ.osm = 0; }
   function vjBuild() {
-    const LAYOUT = D.def.layout, board = VJE.vjBoard;
-    board.style.aspectRatio = LAYOUT.width + ' / ' + LAYOUT.height;
-    board.textContent = ''; VJ.keys = LAYOUT.keys; VJ.els = [];
-    LAYOUT.keys.forEach((k, i) => {
+    const LAYOUT = D.def.layout, board = VJE.vjBoard, V = boardView(LAYOUT);
+    board.style.aspectRatio = V.width + ' / ' + V.height;
+    board.textContent = ''; VJ.keys = LAYOUT.keys; VJ.els = LAYOUT.keys.map(() => null); VJ.knobs = [];
+    V.items.forEach(it => {
+      const k = it.k, i = it.i;
+      if (it.knob) {
+        /* ノブ: ↺ / ↻ の行をクリックすると1目盛り回す。● の行は押し込み（押している間だけ押したまま） */
+        const el = document.createElement('div'); el.className = 'k knob';
+        placeItem(el, it, V);
+        const box = document.createElement('div'); el.appendChild(box);
+        const rows = knobFill(document, box, it.knob.parts.map(() => ({ main: '' })), -1);
+        it.knob.parts.forEach((j, p) => {
+          const row = rows[p];
+          if (p < 2) row.addEventListener('pointerdown', e => { if (e.button !== 0) return; e.preventDefault(); vjPress(j); vjRelease(j); });
+          else {
+            row.addEventListener('pointerdown', e => { if (e.button !== 0) return; e.preventDefault(); try { row.setPointerCapture(e.pointerId); } catch (err) { /* なくても動く */ } if (!VJ.latched.has(j)) vjPress(j); });
+            row.addEventListener('pointerup', e => { if (e.button === 0 && !VJ.latched.has(j)) vjRelease(j); });
+            row.addEventListener('pointercancel', () => { if (!VJ.latched.has(j)) vjRelease(j); });
+            row.addEventListener('contextmenu', e => { e.preventDefault(); if (VJ.latched.has(j)) { VJ.latched.delete(j); vjRelease(j); } else { VJ.latched.add(j); vjPress(j); } vjUpdate(); });
+          }
+        });
+        el.addEventListener('contextmenu', e => e.preventDefault());
+        board.appendChild(el); VJ.knobs.push({ n: it.knob, el, box });
+        return;
+      }
       const el = document.createElement('div'); el.className = 'k' + (k.enc !== undefined ? ' enc' : '');
-      el.style.left = (k.x / LAYOUT.width * 100) + '%'; el.style.top = (k.y / LAYOUT.height * 100) + '%';
-      el.style.width = (k.w / LAYOUT.width * 100) + '%'; el.style.height = (k.h / LAYOUT.height * 100) + '%';
+      placeItem(el, it, V);
       const box = document.createElement('div'); el.appendChild(box);
       if (k.enc !== undefined) {
         el.addEventListener('pointerdown', e => { if (e.button !== 0) return; e.preventDefault(); vjPress(i); vjRelease(i); });
@@ -3563,7 +3708,7 @@ if (typeof module === 'object' && module.exports) module.exports = JupiterCore;
         if (VJ.latched.has(i)) { VJ.latched.delete(i); vjRelease(i); } else { VJ.latched.add(i); vjPress(i); }
         vjUpdate();
       });
-      board.appendChild(el); VJ.els.push(el);
+      board.appendChild(el); VJ.els[i] = el;
     });
   }
   function vjUpdate() {
@@ -3571,8 +3716,22 @@ if (typeof module === 'object' && module.exports) module.exports = JupiterCore;
     const top = vjTop(), ctx = { macros: st.macros, custom: D.def.custom };
     VJE.vjLayer.textContent = layerLabel(top) + ' ／ 入力: ' + (VJ.kana ? 'あ（かな）' : 'A（英数）');
     const mn = vjModNames(vjMods()); VJE.vjMods.textContent = (mn.length ? mn.join('+') : '') + (VJ.osl >= 0 ? ' 次の1打: レイヤー ' + VJ.osl : '');
+    (VJ.knobs || []).forEach(({ n, el, box }) => {
+      const kcs = n.parts.map(j => { const h = VJ.held.get(j); return h ? h.kc : vjKc(VJ.keys[j]); });
+      const down = n.parts.map(j => VJ.held.has(j)), push = n.parts[2];
+      el.className = 'k knob' + (down[2] ? ' down' : '') + (VJ.latched.has(push) ? ' latch' : '');
+      const rows = box.childNodes;
+      kcs.forEach((kc, p) => {
+        const lab = C.keyLabel(kc, ctx), row = rows[p];
+        row.textContent = KNOB_SYM[p] + ' ' + (lab.main || lab.sub || '');
+        row.className = 'kn' + (down[p] ? ' down' : '');
+        row.title = KNOB_NAME[p] + ': ' + C.keycodeToQmk(kc, D.def.custom) + (p < 2 ? '（クリックで1目盛り回す）' : '（押している間だけ押したまま。右クリックで押したままにする）');
+      });
+    });
     VJ.keys.forEach((k, i) => {
-      const el = VJ.els[i], h = VJ.held.get(i), kc = h ? h.kc : vjKc(k), lab = C.keyLabel(kc, ctx);
+      const el = VJ.els[i];
+      if (!el) return;
+      const h = VJ.held.get(i), kc = h ? h.kc : vjKc(k), lab = C.keyLabel(kc, ctx);
       el.className = 'k ' + lab.kind + (k.enc !== undefined ? ' enc' : '') + (h ? ' down' : '') + (VJ.latched.has(i) ? ' latch' : '');
       const box = el.firstChild; box.textContent = '';
       const main = (k.enc !== undefined ? (k.dir ? '↻ ' : '↺ ') : '') + lab.main;
