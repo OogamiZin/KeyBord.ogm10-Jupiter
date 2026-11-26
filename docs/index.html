@@ -247,6 +247,23 @@ select { font: inherit; color: var(--ink); background: var(--panel); border: 1px
 #xHelp { margin: 0 0 10px; font-size: 13px; color: var(--sub); }
 #xList { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 10px; }
 #xList.ko { grid-template-columns: 1fr; }
+/* QMK 設定 */
+/* QMK 設定のタブではキーを選ばないので、画面下の仮想キーボードを出さない */
+body.vkfix.qsmode:not(.vkkeys) #bar, body.vkfix.qsmode:not(.vkkeys) #vkShowBtn { display: none; }
+#xList.qs { grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); align-items: start; }
+#xList.qs .qstop { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; color: var(--sub); }
+#xList.qs .qstop button { margin-left: auto; }
+.qsgrp { margin: 0; padding: 6px 12px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); min-width: 0; }
+.qsgrp legend { padding: 0 6px; font-weight: 700; font-size: 14px; }
+.qsgrp .qsdesc { margin: 0 0 4px; font-size: 12px; color: var(--sub); }
+.qsrow { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 6px; font-size: 13px; line-height: 1.35; }
+.qsrow:hover { background: color-mix(in srgb, var(--accent) 7%, transparent); }
+.qsrow .qst { flex: 1 1 auto; min-width: 0; }
+.qsrow .qsen { display: block; font-size: 11px; color: var(--sub); }
+.qsrow input[type=number] { width: 88px; flex: 0 0 auto; text-align: right; }
+.qsrow .qsu { flex: 0 0 2.2em; font-size: 12px; color: var(--sub); }
+.qsrow.chg { box-shadow: inset 3px 0 0 var(--dirty); background: color-mix(in srgb, var(--dirty) 10%, transparent); }
+.qsrow.bad input { border-color: var(--warn); }
 .xcard { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
 .xcard.chg { border-color: var(--dirty); }
 .xcard.off { opacity: .75; }
@@ -518,9 +535,10 @@ body.pip .tlist { grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); 
       <button id="xTab_td" class="xtab">タップダンス</button>
       <button id="xTab_combo" class="xtab">コンボ</button>
       <button id="xTab_ko" class="xtab">キーオーバーライド</button>
+      <button id="xTab_qs" class="xtab" title="本家 Vial の「QMK Settings」と同じ設定（タップ判定時間、Auto Shift、マウスキーなど）">QMK 設定</button>
       <span id="xToast"></span>
       <span class="kacts">
-      <button id="xReload" title="拡張（タップダンス・コンボ・キーオーバーライド）の書き込んでいない変更を捨てて、キーボードの今の設定に戻します">変更破棄</button>
+      <button id="xReload" title="拡張（タップダンス・コンボ・キーオーバーライド・QMK 設定）の書き込んでいない変更を捨てて、キーボードの今の設定に戻します">変更破棄</button>
       </span>
     </div>
     <p id="xHelp"></p>
@@ -1490,6 +1508,38 @@ const JupiterCore = (() => {
       const r = await this.cmd([0xFE, 0x0D, DYN_OP[kind] + 1, idx, ...b]);
       if (r[0] !== 0) throw new Error('書き込めませんでした（' + kind + ' ' + idx + '）');
     }
+    /* QMK 設定（Vial の qmk_settings）: 対応している設定番号（qsid）の一覧 */
+    async qsQuery() {
+      if (this.vialProtocol < 4) return [];
+      const out = new Set();
+      let cur = 0;
+      for (let guard = 0; guard < 64; guard++) {
+        const r = await this.cmd([0xFE, 0x09, cur & 0xFF, cur >> 8]);
+        let end = false, mx = cur;
+        for (let i = 0; i + 1 < PKT; i += 2) {
+          const q = r[i] | (r[i + 1] << 8);
+          if (q === 0xFFFF) { end = true; break; }
+          out.add(q); mx = Math.max(mx, q);
+        }
+        if (end || mx === cur) break;
+        cur = mx;   /* 続きは、今回の最大の番号より大きいものから */
+      }
+      return [...out].sort((a, b) => a - b);
+    }
+    async qsGet(qsid, width) {
+      const r = await this.cmd([0xFE, 0x0A, qsid & 0xFF, qsid >> 8]);
+      if (r[0] !== 0) throw new Error('QMK 設定 ' + qsid + ' を読み込めませんでした');
+      let v = 0;
+      for (let i = width - 1; i >= 0; i--) v = v * 256 + r[1 + i];
+      return v;
+    }
+    async qsSet(qsid, width, value) {
+      const b = [];
+      for (let i = 0; i < width; i++) b.push(Math.floor(value / Math.pow(256, i)) & 0xFF);
+      const r = await this.cmd([0xFE, 0x0B, qsid & 0xFF, qsid >> 8, ...b]);
+      if (r[0] !== 0) throw new Error('QMK 設定 ' + qsid + ' を書き込めませんでした');
+    }
+    async qsReset() { await this.cmd([0xFE, 0x0C]); }
     cmd(bytes) {
       const pkt = new Uint8Array(PKT); pkt.set(bytes);
       const run = () => this.tr.send(pkt);
@@ -1582,6 +1632,10 @@ const JupiterCore = (() => {
         ko: Array.from({ length: 4 }, () => [0, 0, 0xFFFF, 0, 0, 0, 7]) };
       if (o.dyn) Object.assign(this.dyn, JSON.parse(JSON.stringify(o.dyn)));
       this.dynDefaults = JSON.stringify(this.dyn);
+      /* QMK 設定（デモ用）: qsid → 値。QMK の初期値に近いもの */
+      this.qs = { 1: 0, 2: 50, 3: 0, 4: 175, 5: 5, 6: 5000, 7: 200, 9: 10, 10: 16, 11: 8, 12: 10, 13: 30, 14: 10, 15: 80, 16: 8, 17: 40,
+        18: 0, 19: 80, 20: 5, 21: 0, 22: 0, 23: 0, 24: 0, 25: 200, 26: 0, 27: 0 };
+      this.qsDefaults = JSON.stringify(this.qs);
       this.def = o.definition ? xzStore(new TextEncoder().encode(JSON.stringify(o.definition))) : new Uint8Array(0);
       this.ls = 0; this.ds = 1; this.subscribed = false; this.onPush = null;
       if (o.seed) { const d = joinMacros(o.seed.map(s => compile(s).bytes).concat(Array(this.count).fill(new Uint8Array(0))).slice(0, this.count)); this.buf.set(d); }
@@ -1649,6 +1703,24 @@ const JupiterCore = (() => {
               if (this.inProgress) { this.counter -= this.step; if (this.counter <= 0) { this.counter = 0; this.inProgress = false; this.unlocked = true; } }
               d[0] = this.unlocked ? 1 : 0; d[1] = this.inProgress ? 1 : 0; d[2] = this.counter; break;
             case 0x08: this.unlocked = false; break;
+            case 0x09: {
+              const gt = d[2] | (d[3] << 8), ids = Object.keys(this.qs).map(Number).filter(q => q > gt).sort((a, b) => a - b).slice(0, 16);
+              d.fill(0xFF); ids.forEach((q, i) => { d[i * 2] = q & 0xFF; d[i * 2 + 1] = q >> 8; });
+              break;
+            }
+            case 0x0A: {
+              const q = d[2] | (d[3] << 8), v = this.qs[q];
+              d.fill(0); if (v === undefined) { d[0] = 1; break; }
+              for (let i = 0; i < 4; i++) d[1 + i] = Math.floor(v / Math.pow(256, i)) & 0xFF;
+              break;
+            }
+            case 0x0B: {
+              const q = d[2] | (d[3] << 8);
+              if (this.qs[q] === undefined) { d[0] = 1; break; }
+              this.qs[q] = d[4] + d[5] * 256 + d[6] * 65536 + d[7] * 16777216; d[0] = 0; this.qsWrites = (this.qsWrites || 0) + 1;
+              break;
+            }
+            case 0x0C: this.qs = JSON.parse(this.qsDefaults); break;
             case 0x0D: {
               const op = d[2], idx = d[3], kind = [null, 'td', 'td', 'combo', 'combo', 'ko', 'ko'][op];
               if (op === 0) { d.fill(0); d[0] = this.dyn.td.length; d[1] = this.dyn.combo.length; d[2] = this.dyn.ko.length; break; }
@@ -2005,11 +2077,11 @@ if (typeof module === 'object' && module.exports) module.exports = JupiterCore;
     });
     const items = [];
     keys.forEach((k, i) => { if (!knobOf.has(i)) items.push({ i, k, x: k.x, y: k.y, w: k.w, h: k.h }); });
-    /* ノブは押し込みキーより幅広く描く（基板の端の外側へはみ出させる。文字が読める大きさにするため） */
-    const midX = Math.max(...keys.map(k => k.x + k.w)) / 2;
+    /* ノブは押し込みキーより幅広く描く（文字が読める大きさにするため）。左右とも同じ大きさ（KNOB_W × 押し込みキーの高さ）で、
+       押し込みキーの右端にそろえる。左は基板の左端から少しはみ出し、右は下の段の BS の真上に来る */
     knobs.forEach(n => {
       const p = keys[n.parts[2]], w = Math.max(p.w, KNOB_W);
-      items.push({ i: n.parts[2], k: p, knob: n, x: p.x + p.w / 2 < midX ? p.x + p.w - w : p.x, y: p.y, w, h: p.h });
+      items.push({ i: n.parts[2], k: p, knob: n, x: p.x + p.w - w, y: p.y, w, h: p.h });
     });
     const x0 = Math.min(...items.map(t => t.x)), y0 = Math.min(...items.map(t => t.y));
     items.forEach(t => { t.x -= x0; t.y -= y0; });
@@ -2650,6 +2722,150 @@ if (typeof module === 'object' && module.exports) module.exports = JupiterCore;
     [4, '解除後にトリガーキーを押し直さない', '修飾キーを離して置き換えが終わったとき、押したままのトリガーキーを送り直しません。'],
     [5, '他のキーを押しても解除しない', '発動中に別のキーを押しても、置き換えを続けます。'],
   ];
+  /* ---- QMK 設定（本家 Vial の「QMK Settings」と同じもの） ----
+     定義は vial-gui の qmk_settings.json と同じ（qsid・ビット・幅）。表示名だけ日本語にしている。
+     ファームウェアが対応している qsid の項目だけを出す。 */
+  const QS_DEFS = [
+    { name: 'Magic（キーの入れ替え）', en: 'Magic', fields: [
+      { q: 21, w: 4, bit: 0, t: 'Caps Lock と左 Ctrl を入れ替える', en: 'Swap Caps Lock and Left Control' },
+      { q: 21, w: 4, bit: 1, t: 'Caps Lock を Ctrl として使う', en: 'Treat Caps Lock as Control' },
+      { q: 21, w: 4, bit: 2, t: '左 Alt と左 GUI を入れ替える', en: 'Swap Left Alt and GUI' },
+      { q: 21, w: 4, bit: 3, t: '右 Alt と右 GUI を入れ替える', en: 'Swap Right Alt and GUI' },
+      { q: 21, w: 4, bit: 4, t: 'GUI キーを無効にする', en: 'Disable the GUI keys' },
+      { q: 21, w: 4, bit: 5, t: '` と Esc を入れ替える', en: 'Swap ` and Escape' },
+      { q: 21, w: 4, bit: 6, t: '\\ と Backspace を入れ替える', en: 'Swap \\ and Backspace' },
+      { q: 21, w: 4, bit: 7, t: 'N キーロールオーバーを有効にする', en: 'Enable N-key rollover' },
+      { q: 21, w: 4, bit: 8, t: '左 Ctrl と左 GUI を入れ替える', en: 'Swap Left Control and GUI' },
+      { q: 21, w: 4, bit: 9, t: '右 Ctrl と右 GUI を入れ替える', en: 'Swap Right Control and GUI' },
+    ] },
+    { name: 'Grave Escape（GESC キー）', en: 'Grave Escape', desc: 'GESC キーは普段 Esc、Shift か GUI を押しながらだと ` を送ります。チェックした修飾キーを押しているときは、常に Esc を送ります。', fields: [
+      { q: 1, bit: 0, t: 'Alt を押しているときも Esc を送る', en: 'Always send Escape if Alt is pressed' },
+      { q: 1, bit: 1, t: 'Ctrl を押しているときも Esc を送る', en: 'Always send Escape if Control is pressed' },
+      { q: 1, bit: 2, t: 'GUI を押しているときも Esc を送る', en: 'Always send Escape if GUI is pressed' },
+      { q: 1, bit: 3, t: 'Shift を押しているときも Esc を送る', en: 'Always send Escape if Shift is pressed' },
+    ] },
+    { name: 'タップと長押し（Tap-Hold）', en: 'Tap-Hold', desc: '長押しで別の動作をするキー（LT・MT・タップダンスなど）の判定です。', fields: [
+      { q: 7, int: true, w: 2, min: 0, max: 10000, u: 'ms', t: '長押しと判定するまでの時間（Tapping Term）', en: 'Tapping Term' },
+      { q: 8, bit: 0, t: 'Permissive Hold（間に別のキーを押して離したら長押し扱い）', en: 'Permissive Hold' },
+      { q: 8, bit: 1, t: 'Ignore Mod Tap Interrupt', en: 'Ignore Mod Tap Interrupt' },
+      { q: 8, bit: 2, t: 'Tapping Force Hold', en: 'Tapping Force Hold' },
+      { q: 8, bit: 3, t: 'Retro Tapping（長押しして何も押さずに離したらタップを送る）', en: 'Retro Tapping' },
+      { q: 22, t: 'Permissive Hold（間に別のキーを押して離したら長押し扱い）', en: 'Permissive Hold' },
+      { q: 23, t: 'Hold On Other Key Press（別のキーを押した時点で長押し扱い）', en: 'Hold On Other Key Press' },
+      { q: 24, t: 'Retro Tapping（長押しして何も押さずに離したらタップを送る）', en: 'Retro Tapping' },
+      { q: 25, int: true, w: 2, min: 0, max: 10000, u: 'ms', t: '続けてタップしたときにタップの連打とみなす時間（Quick Tap Term）', en: 'Quick Tap Term' },
+      { q: 18, int: true, w: 2, min: 0, max: 1000, u: 'ms', t: 'タップを送るときの押してから離すまでの時間（Tap Code Delay）', en: 'Tap Code Delay' },
+      { q: 19, int: true, w: 2, min: 0, max: 1000, u: 'ms', t: 'Caps Lock をタップで送るときの時間（Tap Hold Caps Delay）', en: 'Tap Hold Caps Delay' },
+      { q: 20, int: true, w: 1, min: 0, max: 100, u: '回', t: 'TT キーでレイヤーを固定するまでのタップ回数（Tapping Toggle）', en: 'Tapping Toggle' },
+      { q: 26, t: 'Chordal Hold（同じ手側のキーとの組み合わせはタップ扱い）', en: 'Chordal Hold' },
+      { q: 27, int: true, w: 2, min: 0, max: 10000, u: 'ms', t: '速く打っている間は長押し判定をしない時間（Flow Tap）', en: 'Flow Tap' },
+    ] },
+    { name: 'Auto Shift', en: 'Auto Shift', desc: 'キーを少し長く押すと、Shift を押したときの文字を送ります。', fields: [
+      { q: 3, bit: 0, t: '有効にする', en: 'Enable' },
+      { q: 3, bit: 1, t: '修飾キーにも使う', en: 'Enable for modifiers' },
+      { q: 4, int: true, w: 2, min: 0, max: 1000, u: 'ms', t: 'Shift 付きにするまでの長押し時間', en: 'Timeout' },
+      { q: 3, bit: 2, t: '記号キーには使わない', en: 'Do not Auto Shift special keys' },
+      { q: 3, bit: 3, t: '数字キーには使わない', en: 'Do not Auto Shift numeric keys' },
+      { q: 3, bit: 4, t: '英字キーには使わない', en: 'Do not Auto Shift alpha characters' },
+      { q: 3, bit: 5, t: 'キーリピートを有効にする', en: 'Enable keyrepeat' },
+      { q: 3, bit: 6, t: '長押しの時間を超えたらキーリピートしない', en: 'Disable keyrepeat when timeout is exceeded' },
+    ] },
+    { name: 'コンボ', en: 'Combo', fields: [
+      { q: 2, int: true, w: 2, min: 0, max: 10000, u: 'ms', t: '同時押しとみなす時間', en: 'Time out period for combos' },
+    ] },
+    { name: 'ワンショットキー（OSM・OSL）', en: 'One Shot Keys', fields: [
+      { q: 5, int: true, w: 1, min: 0, max: 50, u: '回', t: 'この回数タップすると、もう一度タップするまで押したままにする', en: 'Tapping this number of times holds the key until tapped once again' },
+      { q: 6, int: true, w: 2, min: 0, max: 60000, u: 'ms', t: 'ワンショットが解除されるまでの時間', en: 'Time (in ms) before the one shot key is released' },
+    ] },
+    { name: 'マウスキー', en: 'Mouse keys', fields: [
+      { q: 9, int: true, w: 2, min: 0, max: 10000, u: 'ms', t: 'カーソルキーを押してから動き始めるまでの時間', en: 'Delay between pressing a movement key and cursor movement' },
+      { q: 10, int: true, w: 2, min: 0, max: 10000, u: 'ms', t: 'カーソルを動かす間隔', en: 'Time between cursor movements in milliseconds' },
+      { q: 11, int: true, w: 2, min: 0, max: 1000, u: '', t: '1回に動かす量', en: 'Step size' },
+      { q: 12, int: true, w: 2, min: 0, max: 1000, u: '', t: '加速が止まる最高速度', en: 'Maximum cursor speed at which acceleration stops' },
+      { q: 13, int: true, w: 2, min: 0, max: 1000, u: '', t: '最高速度になるまでの時間', en: 'Time until maximum cursor speed is reached' },
+      { q: 14, int: true, w: 2, min: 0, max: 10000, u: 'ms', t: 'ホイールキーを押してから動き始めるまでの時間', en: 'Delay between pressing a wheel key and wheel movement' },
+      { q: 15, int: true, w: 2, min: 0, max: 10000, u: 'ms', t: 'ホイールを動かす間隔', en: 'Time between wheel movements' },
+      { q: 16, int: true, w: 2, min: 0, max: 1000, u: '', t: '1回のスクロール量の最大', en: 'Maximum number of scroll steps per scroll action' },
+      { q: 17, int: true, w: 2, min: 0, max: 1000, u: '', t: 'ホイールが最高速度になるまでの時間', en: 'Time until maximum scroll speed is reached' },
+    ] },
+  ];
+  const QS_FIELDS = new Map();   /* qsid → その qsid を使う項目 */
+  QS_DEFS.forEach(g => g.fields.forEach(f => { if (!QS_FIELDS.has(f.q)) QS_FIELDS.set(f.q, []); QS_FIELDS.get(f.q).push(f); }));
+  const qsWidth = q => QS_FIELDS.get(q)[0].w || 1;
+  const Q = { ids: null, base: null, cur: null, err: null };
+  let fitFooterSoon = () => {};   /* 仮想キーボードの表示を切り替えたあと、下の余白を合わせ直す（定義は後ろ） */
+  async function qsReadAll() {
+    const out = {};
+    for (const q of Q.ids) out[q] = await st.vial.qsGet(q, qsWidth(q));
+    return out;
+  }
+  async function ensureQs() {
+    if (Q.base || !st.vial) return;
+    try { Q.ids = (await st.vial.qsQuery()).filter(q => QS_FIELDS.has(q)); Q.base = await qsReadAll(); Q.err = null; }
+    catch (e) { Q.ids = []; Q.base = {}; Q.err = e.message; }
+    Q.cur = clone(Q.base);
+  }
+  const qsChanges = () => (Q.base && Q.cur ? Object.keys(Q.cur).map(Number).filter(q => Q.cur[q] !== Q.base[q]) : []);
+  const qsFieldVal = (src, f) => (f.int ? src[f.q] : f.bit !== undefined ? (src[f.q] >>> f.bit) & 1 : (src[f.q] ? 1 : 0));
+  /* 画面の各行と、タブ・書込ボタンの「変更あり」表示を更新する（入力欄のフォーカスを保つため、作り直さない） */
+  function qsMark() {
+    document.querySelectorAll('#xList .qsrow').forEach(row => {
+      const f = row._f; row.classList.toggle('chg', qsFieldVal(Q.cur, f) !== qsFieldVal(Q.base, f));
+    });
+    $('xTab_qs').classList.toggle('chg', qsChanges().length > 0);
+    updateWriteBtn();
+  }
+  function qsRender(list) {
+    list.className = 'qs';
+    if (Q.err) { list.textContent = 'QMK 設定を読み込めませんでした（' + Q.err + '）'; return; }
+    const ids = new Set(Q.ids || []);
+    const groups = QS_DEFS.filter(g => g.fields.some(f => ids.has(f.q)));
+    if (!groups.length) { list.textContent = 'このキーボードのファームウェアには、QMK 設定がありません。'; return; }
+    const top = document.createElement('div'); top.className = 'qstop';
+    const note = document.createElement('span'); note.textContent = 'ファームウェアが対応している項目だけを表示しています。変更は画面上部の「書込」でまとめて書き込みます。';
+    const reset = document.createElement('button'); reset.type = 'button'; reset.textContent = '初期値に戻す';
+    reset.title = 'QMK 設定をすべて、ファームウェアの初期値に戻します（キーボードにすぐ反映されます）';
+    reset.addEventListener('click', async () => {
+      if (!confirm('QMK 設定をすべて初期値に戻します。キーボードにすぐ反映され、元に戻せません。' + (qsChanges().length ? '\n書き込んでいない QMK 設定の変更も破棄されます。' : '') + '\n実行しますか？')) return;
+      try { await st.vial.qsReset(); Q.base = null; await ensureQs(); extRender(); xToast('QMK 設定を初期値に戻しました', true); }
+      catch (e) { xToast('初期値に戻せませんでした: ' + e.message, false); }
+    });
+    top.append(note, reset); list.appendChild(top);
+    for (const g of groups) {
+      const fs = document.createElement('fieldset'); fs.className = 'qsgrp';
+      const lg = document.createElement('legend'); lg.textContent = g.name; lg.title = g.en; fs.appendChild(lg);
+      if (g.desc) { const p = document.createElement('p'); p.className = 'qsdesc'; p.textContent = g.desc; fs.appendChild(p); }
+      for (const f of g.fields) {
+        if (!ids.has(f.q)) continue;
+        const row = document.createElement('label'); row.className = 'qsrow'; row._f = f;
+        row.title = f.en + '（qsid ' + f.q + (f.bit !== undefined ? '・ビット ' + f.bit : '') + '）';
+        const t = document.createElement('span'); t.className = 'qst'; t.textContent = f.t;
+        const en = document.createElement('span'); en.className = 'qsen'; en.textContent = f.en; t.appendChild(en);
+        if (f.int) {
+          const inp = document.createElement('input'); inp.type = 'number'; inp.min = f.min; inp.max = f.max; inp.step = 1; inp.value = Q.cur[f.q];
+          const u = document.createElement('span'); u.className = 'qsu'; u.textContent = f.u || '';
+          inp.addEventListener('input', () => {
+            const v = Number(inp.value), ok = inp.value !== '' && Number.isInteger(v) && v >= f.min && v <= f.max;
+            row.classList.toggle('bad', !ok);
+            if (ok) { Q.cur[f.q] = v; qsMark(); }
+          });
+          inp.addEventListener('blur', () => { inp.value = Q.cur[f.q]; row.classList.remove('bad'); });
+          row.append(t, inp, u);
+        } else {
+          const c = document.createElement('input'); c.type = 'checkbox'; c.checked = !!qsFieldVal(Q.cur, f);
+          c.addEventListener('change', () => {
+            if (f.bit !== undefined) Q.cur[f.q] = c.checked ? (Q.cur[f.q] | (1 << f.bit)) >>> 0 : (Q.cur[f.q] & ~(1 << f.bit)) >>> 0;
+            else Q.cur[f.q] = c.checked ? 1 : 0;
+            qsMark();
+          });
+          row.append(c, t);
+        }
+        fs.appendChild(row);
+      }
+      list.appendChild(fs);
+    }
+    qsMark();
+  }
   const xFields = kind => (kind === 'td' ? TD_FIELDS : kind === 'combo' ? COMBO_FIELDS : KO_FIELDS);
   const xName = (kind, i) => (kind === 'td' ? 'TD(' + i + ')' : kind === 'combo' ? 'コンボ ' + i : 'オーバーライド ' + i);
   function xToast(msg, ok) { const t = $('xToast'); t.textContent = msg; t.title = msg; t.className = ok ? 'ok' : 'ng'; }
@@ -2686,16 +2902,19 @@ if (typeof module === 'object' && module.exports) module.exports = JupiterCore;
   async function dynSave() {
     const v = st.vial; if (!v || !X.cur) return { ok: true, msg: '変更はありません' };
     const done = (msg, ok) => { xToast(msg, ok); return { ok, msg }; };
-    const ch = dynChanges();
-    if (!ch.length) return done('変更はありません', true);
+    const ch = dynChanges(), qch = qsChanges();
+    if (!ch.length && !qch.length) return done('変更はありません', true);
     try {
       /* ブートローダーの割り当てだけは、ロック中だとファームに拒否される */
       const keysOf = c => X.cur[c.kind][c.idx].slice(0, c.kind === 'td' ? 4 : c.kind === 'combo' ? 5 : 2);
       if (ch.some(c => keysOf(c).includes(0x7C00)) && !(await runUnlock())) return done('ロックを解除できませんでした', false);
       for (const c of ch) await v.dynSet(c.kind, c.idx, X.cur[c.kind][c.idx]);
-      X.base = await readDyn();
-      const left = dynChanges().length;
-      return left ? done(left + ' 件が書き込めていません（読み戻した内容と一致しません）', false) : done(ch.length + ' 件を書き込みました', true);
+      if (ch.length) X.base = await readDyn();
+      /* QMK 設定 */
+      for (const q of qch) await v.qsSet(q, qsWidth(q), Q.cur[q]);
+      if (qch.length) Q.base = await qsReadAll();
+      const left = dynChanges().length + qsChanges().length;
+      return left ? done(left + ' 件が書き込めていません（読み戻した内容と一致しません）', false) : done(ch.length + qch.length + ' 件を書き込みました', true);
     } catch (e) { return done('書き込みに失敗: ' + e.message, false); }
     finally { if (D.mode === 'ext') extRender(); if (D.mode === 'keys') buildSpecialMenu(); }
   }
@@ -2704,7 +2923,7 @@ if (typeof module === 'object' && module.exports) module.exports = JupiterCore;
     try {
       if (!D.keymap) { xToast('読み込み中…', true); await dispLoadKeymap(); }
       if (!K.edit) { K.edit = clone(D.keymap); K.encEdit = clone(D.enc); }
-      await ensureDyn();
+      await ensureDyn(); await ensureQs();
       xToast('', true);
     } catch (e) { xToast('読み込みに失敗: ' + e.message, false); return; }
     buildSpecialMenu();
@@ -2714,6 +2933,7 @@ if (typeof module === 'object' && module.exports) module.exports = JupiterCore;
     td: '1つのキーに、押し方ごとの動作を持たせます。キー割当で TD(番号) を割り当てたキーで動きます（「一覧から選ぶ」→ タップダンス）。判定時間は、長押しや2回目のタップを待つ時間です。',
     combo: '入力のキーを同時に押すと、出力のキーを送ります。入力は2つ以上、キーの位置ではなく割り当てているキー（KC_J など）で指定します。',
     ko: '修飾キーとの組み合わせを別のキーに置き換えます。例: トリガー修飾 Shift ＋ トリガー BS → 置き換え Del。「有効」にしたものだけ動きます。',
+    qs: '本家 Vial の「QMK Settings」と同じ設定です。長押しの判定時間、Auto Shift、コンボの判定時間、マウスキーの速さなどを変えられます。キーボードに保存され、ファームウェアを書き直さずに変えられます。',
   };
   function extRender() {
     if (!X.cur || !D.def) return;
@@ -2723,10 +2943,13 @@ if (typeof module === 'object' && module.exports) module.exports = JupiterCore;
       b.classList.toggle('on', X.tab === k); b.classList.toggle('chg', ch.some(c => c.kind === k));
       b.textContent = DYN_NAMES[k] + (X.n && X.n[k] ? '（' + X.n[k] + '）' : '');
     }
+    $('xTab_qs').classList.toggle('on', X.tab === 'qs'); $('xTab_qs').classList.toggle('chg', qsChanges().length > 0);
     updateWriteBtn();
     tipHide(document);
     const list = $('xList'); list.textContent = ''; list.className = X.tab;
     $('xHelp').textContent = X_HELP[X.tab];
+    document.body.classList.toggle('qsmode', X.tab === 'qs'); fitFooterSoon();
+    if (X.tab === 'qs') { $('xEdit').hidden = true; if (Q.cur) qsRender(list); else list.textContent = '読み込み中…'; return; }
     if (X.unsupported || !X.n[X.tab]) {
       list.textContent = X.unsupported ? 'このキーボードからは読み込めませんでした' + (X.err ? '（' + X.err + '）' : '') : 'このキーボードのファームウェアでは、' + DYN_NAMES[X.tab] + 'は使えません。';
       $('xEdit').hidden = true; return;
@@ -2838,23 +3061,27 @@ if (typeof module === 'object' && module.exports) module.exports = JupiterCore;
     try { kc = C.keycodeFromText(text, D.def.custom); } catch (e) { xToast(e.message, false); return false; }
     extAssign(kc); return true;
   }
-  ['td', 'combo', 'ko'].forEach(k => $('xTab_' + k).addEventListener('click', () => { X.tab = k; X.sel = null; extRender(); }));
+  ['td', 'combo', 'ko', 'qs'].forEach(k => $('xTab_' + k).addEventListener('click', () => { X.tab = k; X.sel = null; extRender(); }));
   $('xApply').addEventListener('click', () => extAssignText($('xText').value));
   $('xText').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); extAssignText($('xText').value); } });
   $('xNone').addEventListener('click', () => extAssign(0));
   $('xRevert').addEventListener('click', () => { const s = X.sel; if (!s) return; X.cur[s.kind][s.idx][s.field] = X.base[s.kind][s.idx][s.field]; extRender(); });
   $('xSpecialBtn').addEventListener('click', e => { e.stopPropagation(); keysMenu($('kSpecialMenu').hidden); });
   $('xReload').addEventListener('click', async () => {
-    const n = dynChanges().length;
+    const n = dynChanges().length + qsChanges().length;
     if (n && !confirm('拡張の書き込んでいない変更 ' + n + ' 件を破棄しますか？')) return;
-    try { X.base = await readDyn(); X.cur = clone(X.base); extRender(); xToast('', true); }
+    try {
+      X.base = await readDyn(); X.cur = clone(X.base);
+      Q.base = null; await ensureQs();
+      extRender(); xToast('', true);
+    }
     catch (e) { xToast('読み込みに失敗: ' + e.message, false); }
   });
 
   /* ---- 画面上部の「書き込み」: マクロとキー割当の変更をまとめて書き込む ---- */
   function pendingCount() {
     const macros = st.vial ? st.macros.filter((x, i) => x !== st.orig[i]).length : 0;
-    return { macros, keys: keysChanges().length, dyn: dynChanges().length };
+    return { macros, keys: keysChanges().length, dyn: dynChanges().length + qsChanges().length };
   }
   function updateWriteBtn() {
     const b = $('btnWrite'); if (!b) return;
@@ -2893,6 +3120,7 @@ if (typeof module === 'object' && module.exports) module.exports = JupiterCore;
     if (dev) { try { await dev.close(); } catch (e) { /* 閉じられなくても続ける */ } }
     D.def = null; D.keymap = null; D.enc = null; D.state = null; D.supported = null; D.pin = null; D.trig = false;
     X.base = null; X.cur = null; X.n = null; X.unsupported = false; X.sel = null;
+    Q.ids = null; Q.base = null; Q.cur = null; Q.err = null;
     K.edit = null; K.encEdit = null; K.trig = false; K.layerInit = false; K.layer = 0; K.sel = 0;
     ['modes', 'modes2', 'app', 'bar', 'keys', 'disp', 'ext'].forEach(id => { $(id).hidden = true; });
     $('intro').hidden = false;
@@ -2948,7 +3176,7 @@ if (typeof module === 'object' && module.exports) module.exports = JupiterCore;
      キーコードは数値で書く（Vial は数値をそのまま読む。名前だと、Vial の知らない書き方が KC_NO にされるおそれがある） */
   async function exportAll() {
     if (!st.vial) return;
-    try { await ensureKeys(); await ensureDyn(); } catch (e) { hdrMsg('読み込みに失敗: ' + e.message, false); return; }
+    try { await ensureKeys(); await ensureDyn(); await ensureQs(); } catch (e) { hdrMsg('読み込みに失敗: ' + e.message, false); return; }
     const bad = st.macros.findIndex(x => C.compile(x).errors.length);
     if (bad >= 0) { hdrMsg('M' + bad + ' にエラーがあるため、エクスポートできません', false); return; }
     const inLayout = new Set(D.def.layout.keys.filter(k => k.enc === undefined).map(k => k.row + ',' + k.col));
@@ -2962,6 +3190,7 @@ if (typeof module === 'object' && module.exports) module.exports = JupiterCore;
       data.combo = X.cur.combo.map(e => e.slice());
       data.key_override = X.cur.ko.map(e => ({ trigger: e[0], replacement: e[1], layers: e[2], trigger_mods: e[3], negative_mod_mask: e[4], suppressed_mods: e[5], options: e[6] }));
     }
+    if (Q.cur && Q.ids && Q.ids.length) { data.settings = {}; Q.ids.forEach(q => { data.settings[q] = Q.cur[q]; }); }   /* 本家 Vial と同じ形（qsid → 値） */
     const text = JSON.stringify(data).replace('"__UID__"', uidDecimal(st.vial.uid || []));
     const d = new Date(), z = n => String(n).padStart(2, '0');
     const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
@@ -3018,7 +3247,7 @@ if (typeof module === 'object' && module.exports) module.exports = JupiterCore;
   }
   async function importAll(file) {
     try {
-      await ensureKeys(); await ensureDyn();
+      await ensureKeys(); await ensureDyn(); await ensureQs();
       const raw = await file.text();
       const parsed = parseAllFile(JSON.parse(raw));
       /* .vil に書かれた UID が、つないでいるキーボードと違うときは確認する（桁落ちしないよう文字のまま比べる） */
@@ -3039,6 +3268,12 @@ if (typeof module === 'object' && module.exports) module.exports = JupiterCore;
         $('src').value = st.macros[st.sel];
       }
       if (X.cur && !X.unsupported) for (const k of ['td', 'combo', 'ko']) if (parsed[k]) X.cur[k].forEach((e, i) => { if (parsed[k][i]) X.cur[k][i] = parsed[k][i]; });
+      /* QMK 設定（本家 Vial の .vil の settings）。このキーボードが対応している項目だけ取り込む */
+      const sets = JSON.parse(raw).settings;
+      if (sets && typeof sets === 'object' && Q.cur && Q.ids) for (const q of Q.ids) {
+        const v = sets[q];
+        if (Number.isInteger(v) && v >= 0 && v < Math.pow(256, qsWidth(q))) Q.cur[q] = v;
+      }
       refresh(); keysRender(); keysShowSel(); if ($('kTextBox').open) keysTextShow(); if (D.mode === 'ext') extRender();
       const q = pendingCount();
       hdrMsg(file.name + ' を読み込みました（変更 ' + (q.macros + q.keys + q.dyn) + ' 件）。「書込」でキーボードに反映されます', true);
@@ -3366,6 +3601,7 @@ if (typeof module === 'object' && module.exports) module.exports = JupiterCore;
   /* 固定フッターの高さぶん、本文の下に余白を取る */
   const fitFooter = () => { const h = ($('bar').offsetHeight + 16) + 'px'; $('app').style.paddingBottom = h; $('keys').style.paddingBottom = h; $('ext').style.paddingBottom = h; };
   if (window.ResizeObserver) new ResizeObserver(fitFooter).observe($('bar'));
+  fitFooterSoon = () => requestAnimationFrame(fitFooter);
   window.addEventListener('resize', fitFooter);
 
   /* ---- 保存・読み込み ---- */
@@ -3881,7 +4117,7 @@ if (typeof module === 'object' && module.exports) module.exports = JupiterCore;
     $('fwMsg').textContent = '保存した ogm10_jupiter_vial.uf2 を、RPI-RP2 ドライブにドラッグしてください。書き込みが終わるとキーボードが再起動します。';
   });
 
-  window.addEventListener('beforeunload', e => { if (st.vial && (dirty() || keysChanges().length || dynChanges().length)) { e.preventDefault(); e.returnValue = ''; } });
+  window.addEventListener('beforeunload', e => { if (st.vial && (dirty() || keysChanges().length || dynChanges().length || qsChanges().length)) { e.preventDefault(); e.returnValue = ''; } });
   $('btnConnect').addEventListener('click', () => (st.vial ? endSession() : connect()));
   $('btnDemo').addEventListener('click', startDemo);
 })();
