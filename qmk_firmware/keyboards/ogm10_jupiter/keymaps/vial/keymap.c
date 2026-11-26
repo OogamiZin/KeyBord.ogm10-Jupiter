@@ -754,12 +754,16 @@ void post_process_record_user(uint16_t keycode, keyrecord_t *record) {
 //   キーボード -> PC: [0xF7, 0x05, ビルド日時の文字列（例 "Nov 18 2026 07:05:00"、0 終端）]
 //   ※ 設定ツールはこの文字列と、GitHub Pages に公開した最新版（docs/firmware/latest.json）を比べて更新の有無を出す。
 //     公開する側（.github/scripts/publish_fw.py）は、.uf2 の中の "JUPFW:" に続く文字列を同じ版として読み取る。
+//   PC -> キーボード: [0xF7, 0x06, 位置(上位), 位置(下位)]
+//   キーボード -> PC: [0xF7, 0x06, 位置(上位), 位置(下位), 全体の長さ(上位), 全体の長さ(下位), その位置から 26 バイトぶんの default_macro_buffer]
+//   ※ 設定ツールのマクロ画面の「初期状態に戻す」で使う（読むだけ。書き込みは設定ツールの「書込」で行う）
 #define JUP_HID_ID            0xF7
 #define JUP_HID_GET           0x01
 #define JUP_HID_PUSH          0x02
 #define JUP_HID_DEFAULT_KEYS  0x03
 #define JUP_HID_DEFAULT_ENC   0x04
 #define JUP_HID_FW_BUILD      0x05
+#define JUP_HID_DEFAULT_MACRO 0x06
 #define JUP_HID_VERSION       1
 #define JUP_HID_SUBSCRIBE_MS  3000
 
@@ -812,6 +816,14 @@ void raw_hid_receive_kb(uint8_t *data, uint8_t length) {
             data[4 + i * 2] = kc >> 8;
             data[5 + i * 2] = kc & 0xFF;
         }
+        return;
+    }
+    if (length >= 32 && data[0] == JUP_HID_ID && data[1] == JUP_HID_DEFAULT_MACRO) {
+        const uint16_t total = sizeof(default_macro_buffer);
+        uint16_t       off   = ((uint16_t)data[2] << 8) | data[3];
+        data[4] = total >> 8;
+        data[5] = total & 0xFF;
+        for (uint8_t i = 0; i < 26; i++, off++) data[6 + i] = off < total ? pgm_read_byte(&default_macro_buffer[off]) : 0;
         return;
     }
     if (length >= 32 && data[0] == JUP_HID_ID && data[1] == JUP_HID_FW_BUILD) {
