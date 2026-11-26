@@ -407,12 +407,13 @@ body.pip .tlist { grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); 
   <section id="editor">
     <div class="row">
       <h2 id="edTitle">M0</h2>
-      <span class="grow"></span>
       <span id="edSize" class="hint"></span>
+      <span class="grow"></span>
       <button id="mExport" title="選択中のマクロだけをファイルに保存します">個別エクスポート</button>
       <button id="mImport" title="個別エクスポートしたファイル、または .vil の中のマクロを、選択中のマクロに読み込みます">個別インポート</button>
       <input type="file" id="mFile" accept=".json,.vil,application/json" hidden>
       <button id="btnMacroDefault" title="選択中のマクロを、ファームウェアに書かれた初期状態（keymap.c の default_macro_buffer）に戻します。「書込」でキーボードに反映されます">初期状態に戻す</button>
+      <button id="btnMacroRevert" title="選択中のマクロの書き込んでいない変更を捨てて、キーボードに書き込まれている内容に戻します">変更破棄</button>
       <div id="mVilBox" class="group" hidden><span class="cap" id="mVilName"></span><select id="mVilSel"></select><button id="mVilUse" class="primary">選択中のマクロに取り込む</button><button id="mVilCancel">やめる</button></div>
     </div>
     <div class="row">
@@ -3372,6 +3373,7 @@ if (typeof module === 'object' && module.exports) module.exports = JupiterCore;
     const cur = comp[st.sel];
     $('edTitle').textContent = 'M' + st.sel;
     $('edSize').textContent = cur.bytes.length + ' バイト';
+    $('btnMacroRevert').disabled = st.macros[st.sel] === st.orig[st.sel];
     const el = $('errors'); el.textContent = '';
     cur.errors.forEach(e => {
       const li = document.createElement('li');
@@ -3480,6 +3482,12 @@ if (typeof module === 'object' && module.exports) module.exports = JupiterCore;
     const ms = Math.round(Number($('waitMs').value));
     if (!(ms >= 0 && ms <= C.MAX_WAIT)) { toast('待機は 0〜' + C.MAX_WAIT + ' ms です', false); return; }
     toast('', true); insert('{WAIT:' + ms + '}');
+  });
+  /* 選択中のマクロの書き込んでいない変更を捨てる（キーボードから読んだ内容に戻す） */
+  $('btnMacroRevert').addEventListener('click', () => {
+    if (!st.vial || st.macros[st.sel] === st.orig[st.sel]) return;
+    st.macros[st.sel] = st.orig[st.sel]; ta.value = st.orig[st.sel]; refresh(); ta.focus();
+    toast('M' + st.sel + ' の変更を破棄しました', true);
   });
   /* 選択中のマクロを、ファームウェアの初期状態（default_macro_buffer）に戻す。書き込みは「書込」で */
   $('btnMacroDefault').addEventListener('click', async () => {
