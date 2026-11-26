@@ -412,7 +412,7 @@ body.pip .tlist { grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); 
       <button id="mExport" title="選択中のマクロだけをファイルに保存します">個別エクスポート</button>
       <button id="mImport" title="個別エクスポートしたファイル、または .vil の中のマクロを、選択中のマクロに読み込みます">個別インポート</button>
       <input type="file" id="mFile" accept=".json,.vil,application/json" hidden>
-      <button id="btnClear">このマクロを空にする</button>
+      <button id="btnMacroDefault" title="選択中のマクロを、ファームウェアに書かれた初期状態（keymap.c の default_macro_buffer）に戻します。「書込」でキーボードに反映されます">初期状態に戻す</button>
       <div id="mVilBox" class="group" hidden><span class="cap" id="mVilName"></span><select id="mVilSel"></select><button id="mVilUse" class="primary">選択中のマクロに取り込む</button><button id="mVilCancel">やめる</button></div>
     </div>
     <div class="row">
@@ -1480,6 +1480,18 @@ const JupiterCore = (() => {
       }
       return { keymap: km, enc };
     }
+    /* ファームウェアに書かれたマクロの初期状態（default_macro_buffer）を読む。対応していないファームでは null */
+    async defaultMacros() {
+      let r = await this.cmd([0xF7, 0x06, 0, 0]);
+      if (r[0] !== 0xF7 || r[1] !== 0x06) return null;
+      const total = (r[4] << 8) | r[5], out = new Uint8Array(total);
+      for (let off = 0; off < total; ) {
+        if (off) { r = await this.cmd([0xF7, 0x06, off >> 8, off & 0xFF]); if (r[0] !== 0xF7 || r[1] !== 0x06 || ((r[2] << 8) | r[3]) !== off) return null; }
+        const n = Math.min(26, total - off);
+        out.set(r.slice(6, 6 + n), off); off += n;
+      }
+      return out;
+    }
     /* ファームウェアの版（ビルド日時の文字列）。古いファームでは null */
     async fwBuild() {
       const r = await this.cmd([0xF7, 0x05]);
@@ -1639,6 +1651,8 @@ const JupiterCore = (() => {
       this.def = o.definition ? xzStore(new TextEncoder().encode(JSON.stringify(o.definition))) : new Uint8Array(0);
       this.ls = 0; this.ds = 1; this.subscribed = false; this.onPush = null;
       if (o.seed) { const d = joinMacros(o.seed.map(s => compile(s).bytes).concat(Array(this.count).fill(new Uint8Array(0))).slice(0, this.count)); this.buf.set(d); }
+      /* ファームウェアのマクロの初期状態（デモでは、最初に入れたマクロをそのまま初期状態とする） */
+      this.defMacros = o.seed ? joinMacros(o.seed.map(s => compile(s).bytes)) : new Uint8Array(0);
     }
     layerPacket(d, kind) {
       d[0] = 0xF7; d[1] = kind; d[2] = 1; d[3] = highestLayer(this.ls | this.ds);
@@ -1670,6 +1684,12 @@ const JupiterCore = (() => {
         }
         case 0xF7:
           if (d[1] === 5) { const v = this.fwBuild || 'Nov 1 2026 00:00:00'; d.fill(0, 2); for (let i = 0; i < v.length; i++) d[2 + i] = v.charCodeAt(i); break; }
+          if (d[1] === 6) {
+            const off = (d[2] << 8) | d[3], t = this.defMacros.length;
+            d.fill(0, 4); d[4] = t >> 8; d[5] = t & 0xFF;
+            for (let i = 0; i < 26 && off + i < t; i++) d[6 + i] = this.defMacros[off + i];
+            break;
+          }
           if (this.layerSupport && d[1] === 3) {
             const x = JSON.parse(this.defaults), per = this.rows * this.cols;
             let pos = (d[2] << 8) | d[3];
@@ -3461,7 +3481,19 @@ if (typeof module === 'object' && module.exports) module.exports = JupiterCore;
     if (!(ms >= 0 && ms <= C.MAX_WAIT)) { toast('待機は 0〜' + C.MAX_WAIT + ' ms です', false); return; }
     toast('', true); insert('{WAIT:' + ms + '}');
   });
-  $('btnClear').addEventListener('click', () => { ta.value = ''; st.macros[st.sel] = ''; refresh(); ta.focus(); });
+  /* 選択中のマクロを、ファームウェアの初期状態（default_macro_buffer）に戻す。書き込みは「書込」で */
+  $('btnMacroDefault').addEventListener('click', async () => {
+    const v = st.vial; if (!v) return;
+    try {
+      if (v.defMacroBuf === undefined) v.defMacroBuf = await v.defaultMacros();
+      if (!v.defMacroBuf) { toast('このファームウェアは、マクロの初期状態の読み出しに対応していません。「ファーム更新」で最新版にしてください', false); return; }
+      const parts = C.splitMacros(v.defMacroBuf, v.macroCount), text = C.format(C.deserialize(parts[st.sel] || new Uint8Array(0)));
+      if (text === st.macros[st.sel]) { toast('M' + st.sel + ' はすでに初期状態です', true); return; }
+      if (st.macros[st.sel] && !confirm('M' + st.sel + ' を初期状態' + (text ? '' : '（空）') + 'に戻します。今の内容は消えます（「書込」を押すまではキーボードは変わりません）。よろしいですか？')) return;
+      ta.value = text; st.macros[st.sel] = text; refresh(); ta.focus();
+      toast('M' + st.sel + ' を初期状態' + (text ? '' : '（空）') + 'に戻しました。「書込」でキーボードに反映されます', true);
+    } catch (e) { toast('初期状態を読み込めませんでした: ' + e.message, false); }
+  });
 
   /* ---- キー入力の取り込み ---- */
   const CODE = {
